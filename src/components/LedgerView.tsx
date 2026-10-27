@@ -346,10 +346,11 @@ export const LedgerView: React.FC = () => {
                 <label className="block text-slate-600 font-medium mb-1">Amount (KES)</label>
                 <input
                   type="number"
-                  step="100"
-                  min="100"
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  step="any"
+                  min="1"
+                  placeholder="e.g. 1200"
+                  value={amount || ''}
+                  onChange={(e) => setAmount(Number(e.target.value.replace(/,/g, '')))}
                   className="w-full border border-slate-300 rounded-lg p-2"
                   required
                 />
@@ -426,10 +427,11 @@ export const LedgerView: React.FC = () => {
                   <label className="block text-slate-600 font-medium mb-1">Amount (KES)</label>
                   <input
                     type="number"
-                    step="100"
+                    step="any"
                     min="1"
-                    value={amount}
-                    onChange={(e) => setAmount(Number(e.target.value))}
+                    placeholder="e.g. 1200"
+                    value={amount || ''}
+                    onChange={(e) => setAmount(Number(e.target.value.replace(/,/g, '')))}
                     className="w-full border border-slate-300 rounded-lg p-2"
                     required
                   />

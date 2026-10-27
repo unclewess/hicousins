@@ -282,8 +282,11 @@ export const MembersView: React.FC = () => {
                   <label className="block text-slate-600 font-medium mb-1">Reg Fee (KES)</label>
                   <input
                     type="number"
-                    value={newRegFee}
-                    onChange={(e) => setNewRegFee(Number(e.target.value))}
+                    step="any"
+                    min="0"
+                    placeholder="e.g. 200"
+                    value={newRegFee || ''}
+                    onChange={(e) => setNewRegFee(Number(e.target.value.replace(/,/g, '')))}
                     className="w-full border border-slate-300 rounded-lg p-2"
                     required
                   />
