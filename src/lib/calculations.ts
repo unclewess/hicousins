@@ -1,4 +1,4 @@
-import { Member, LedgerEntry, GroupSettings, MemberCalculatedStatement, DashboardTotals, MemberStatus } from '../types';
+import { Member, LedgerEntry, GroupSettings, MemberCalculatedStatement, DashboardTotals, MemberStatus, Expense, ExpenseCategory, MmfReconciliationSnapshot, TreasurerDebtRecord } from '../types';
 
 export const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -371,5 +371,108 @@ export function calculateDashboardTotals(
       neverActiveCount,
     },
     statements
+  };
+}
+
+// ============================================================================
+// Phase 2 Calculations: Expenses, MMF Reconciliation, and Treasurer Debt
+// ============================================================================
+
+/**
+ * Computes expense breakdowns and totals for confirmed expenses.
+ */
+export function calculateExpensesBreakdown(expenses: Expense[]): {
+  totalExpenses: number;
+  byCategory: Record<ExpenseCategory, number>;
+} {
+  const confirmed = expenses.filter(e => e.status === 'Confirmed');
+  const byCategory: Record<ExpenseCategory, number> = {
+    'Transaction Cost': 0,
+    'Group Registration Fees': 0,
+    'Meeting Expenses': 0,
+    'Communication': 0,
+    'Other Group Expenses': 0,
+  };
+
+  let totalExpenses = 0;
+  confirmed.forEach(e => {
+    byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
+    totalExpenses += e.amount;
+  });
+
+  totalExpenses = Math.round(totalExpenses * 100) / 100;
+  for (const cat in byCategory) {
+    byCategory[cat as ExpenseCategory] = Math.round(byCategory[cat as ExpenseCategory] * 100) / 100;
+  }
+
+  return { totalExpenses, byCategory };
+}
+
+/**
+ * Computes MMF reconciliation and net fund value.
+ * cash_on_hand = money_in - Expenses - Deposited to MMF
+ * expected_MMF = deposited + interest
+ * discrepancy = |MMF balance - expected_MMF|
+ * net_fund = MMF balance + cash_on_hand
+ */
+export function calculateMmfReconciliation(
+  moneyIn: number,
+  totalExpenses: number,
+  totalDeposited: number,
+  mmfBalance: number,
+  interestEarned: number,
+  asOfDateStr: string = '2026-10-25'
+): MmfReconciliationSnapshot {
+  const rawCash = moneyIn - totalExpenses - totalDeposited;
+  const cashOnHand = Math.round(rawCash * 100) / 100;
+  const negativeCashFlag = cashOnHand < 0;
+
+  const expectedBalance = Math.round((totalDeposited + interestEarned) * 100) / 100;
+  const discrepancy = Math.round(Math.abs(mmfBalance - expectedBalance) * 100) / 100;
+  const status: 'Balanced' | 'Discrepancy' = discrepancy < 1 ? 'Balanced' : 'Discrepancy';
+
+  const rawNetFund = mmfBalance + cashOnHand;
+  const netFundValue = Math.round(rawNetFund * 100) / 100;
+
+  return {
+    groupId: 'group-ndhuhulu-001',
+    asOfDate: asOfDateStr,
+    totalDeposited,
+    mmfBalance,
+    interestEarned,
+    expectedBalance,
+    discrepancy,
+    status,
+    cashOnHand,
+    netFundValue,
+    negativeCashFlag,
+    notes: negativeCashFlag
+      ? `Negative Cash Flag (KES ${cashOnHand.toFixed(2)}): The treasurer deposited more money into the MMF than net money collected from members (using their own money to round up/cover deposit costs). Reconcile treasurer reimbursement.`
+      : status === 'Discrepancy'
+      ? "Discrepancy may be caused by: (1) Antoinette's outstanding KES 6,184 debt not yet in MMF (2) Accrued interest timing (3) Undeposited cash on hand."
+      : undefined
+  };
+}
+
+/**
+ * Computes treasurer debt balance (Antoinette Ochieng).
+ * outstanding = agreed liability - repaid to date
+ */
+export function calculateTreasurerDebt(
+  agreedLiability: number,
+  payments: LedgerEntry[],
+  debtorName: string = 'Antoinette Ochieng'
+): TreasurerDebtRecord {
+  const repaidToDate = payments
+    .filter(p => p.type === 'Debt Repayment' && p.status === 'Confirmed')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const outstandingBalance = agreedLiability - repaidToDate;
+
+  return {
+    agreedLiability,
+    repaidToDate,
+    outstandingBalance,
+    debtorName,
   };
 }

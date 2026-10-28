@@ -1,7 +1,31 @@
 import { useState, useEffect } from 'react';
-import { Group, Member, LedgerEntry, RoleTerm, Membership, User, AuditLogEntry, RoleType } from '../types';
+import {
+  Group,
+  Member,
+  LedgerEntry,
+  RoleTerm,
+  Membership,
+  User,
+  AuditLogEntry,
+  RoleType,
+  Expense,
+  ExpenseCategory,
+  MmfDepositEntry,
+  DocumentRecord,
+  DocumentCategory,
+  DocumentVisibility,
+  MmfReconciliationSnapshot,
+  TreasurerDebtRecord
+} from '../types';
 import { importNdhuhuluData } from '../lib/migration';
-import { getFinancialYear } from '../lib/calculations';
+import {
+  getFinancialYear,
+  calculateDashboardTotals,
+  calculateExpensesBreakdown,
+  calculateMmfReconciliation,
+  calculateTreasurerDebt
+} from '../lib/calculations';
+import { NDHUHULU_AUDIT_INPUTS } from '../data/ndhuhuluRawData';
 
 // Storage keys
 const STORAGE_PREFIX = 'hicousins_';
@@ -14,6 +38,10 @@ const AUDIT_LOG_KEY = `${STORAGE_PREFIX}audit_log`;
 const CURRENT_USER_KEY = `${STORAGE_PREFIX}current_user`;
 const CURRENT_GROUP_KEY = `${STORAGE_PREFIX}current_group_id`;
 const AS_OF_DATE_KEY = `${STORAGE_PREFIX}as_of_date`;
+const EXPENSES_KEY = `${STORAGE_PREFIX}expenses`;
+const MMF_DEPOSITS_KEY = `${STORAGE_PREFIX}mmf_deposits`;
+const DOCUMENTS_KEY = `${STORAGE_PREFIX}documents`;
+const AUDIT_INPUTS_KEY = `${STORAGE_PREFIX}audit_inputs`;
 
 // Mock accounts for quick testing all roles
 export const MOCK_USERS: Array<{ id: string; name: string; email: string; phone?: string; role: RoleType; memberId?: string }> = [
@@ -36,6 +64,10 @@ export class ChamaStore {
   private roleTerms: RoleTerm[] = [];
   private memberships: Membership[] = [];
   private auditLog: AuditLogEntry[] = [];
+  private expenses: Expense[] = [];
+  private mmfDeposits: MmfDepositEntry[] = [];
+  private documents: DocumentRecord[] = [];
+  private auditInputs = { ...NDHUHULU_AUDIT_INPUTS };
   private currentUser: User = { id: MOCK_USERS[0].id, email: MOCK_USERS[0].email, fullName: MOCK_USERS[0].name, authProvider: 'google' };
   private currentGroupId: string = 'group-ndhuhulu-001';
   private asOfDate: string = '2026-10-25'; // Benchmark audit date by default
@@ -54,6 +86,10 @@ export class ChamaStore {
       this.members = migration.members;
       this.payments = migration.payments;
       this.roleTerms = migration.roleTerms;
+      this.expenses = migration.expenses;
+      this.mmfDeposits = migration.mmfDeposits;
+      this.documents = migration.documents;
+      this.auditInputs = { ...migration.auditInputs };
 
       // Seed mock memberships for users
       this.memberships = MOCK_USERS.map((u, i) => ({
@@ -80,6 +116,7 @@ export class ChamaStore {
           details: {
             membersCount: this.members.length,
             paymentsCount: this.payments.length,
+            expensesCount: this.expenses.length,
             unmatchedNames: migration.unmatchedNames,
           },
           timestamp: new Date().toISOString(),
@@ -95,6 +132,10 @@ export class ChamaStore {
         this.roleTerms = JSON.parse(localStorage.getItem(ROLE_TERMS_KEY) || '[]');
         this.memberships = JSON.parse(localStorage.getItem(MEMBERSHIPS_KEY) || '[]');
         this.auditLog = JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || '[]');
+        this.expenses = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]');
+        this.mmfDeposits = JSON.parse(localStorage.getItem(MMF_DEPOSITS_KEY) || '[]');
+        this.documents = JSON.parse(localStorage.getItem(DOCUMENTS_KEY) || '[]');
+        this.auditInputs = JSON.parse(localStorage.getItem(AUDIT_INPUTS_KEY) || JSON.stringify(NDHUHULU_AUDIT_INPUTS));
         this.currentGroupId = localStorage.getItem(CURRENT_GROUP_KEY) || 'group-ndhuhulu-001';
         this.asOfDate = localStorage.getItem(AS_OF_DATE_KEY) || '2026-10-25';
         
@@ -117,6 +158,10 @@ export class ChamaStore {
     localStorage.setItem(ROLE_TERMS_KEY, JSON.stringify(this.roleTerms));
     localStorage.setItem(MEMBERSHIPS_KEY, JSON.stringify(this.memberships));
     localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(this.auditLog));
+    localStorage.setItem(EXPENSES_KEY, JSON.stringify(this.expenses));
+    localStorage.setItem(MMF_DEPOSITS_KEY, JSON.stringify(this.mmfDeposits));
+    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(this.documents));
+    localStorage.setItem(AUDIT_INPUTS_KEY, JSON.stringify(this.auditInputs));
     localStorage.setItem(CURRENT_GROUP_KEY, this.currentGroupId);
     localStorage.setItem(AS_OF_DATE_KEY, this.asOfDate);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(this.currentUser));
@@ -166,6 +211,52 @@ export class ChamaStore {
 
   public getAuditLog(groupId = this.currentGroupId): AuditLogEntry[] {
     return this.auditLog.filter(a => a.groupId === groupId);
+  }
+
+  // --- Phase 2 Getters ---
+
+  public getExpenses(groupId = this.currentGroupId): Expense[] {
+    return this.expenses.filter(e => e.groupId === groupId);
+  }
+
+  public getMmfDeposits(groupId = this.currentGroupId): MmfDepositEntry[] {
+    return this.mmfDeposits.filter(d => d.groupId === groupId);
+  }
+
+  public getAuditInputs() {
+    return { ...this.auditInputs };
+  }
+
+  public getDocuments(groupId = this.currentGroupId): DocumentRecord[] {
+    return this.documents.filter(d => d.groupId === groupId);
+  }
+
+  public getMmfSnapshot(): MmfReconciliationSnapshot {
+    const { totals } = calculateDashboardTotals(
+      this.getMembers(),
+      this.getLedgerEntries(),
+      new Date(`${this.asOfDate}T12:00:00Z`),
+      this.getCurrentGroup()?.settings || { share_value: 100, penalty_rate: 0.01, penalty_start: '2025-10-01', penalty_grace_months: 1, financial_year_start_month: 10, stand_for_office_max_months_behind: 2, document_approvals_required: 1, registration_fee_default: 200, meeting_quorum: null, absence_fines_enabled: false, term_length_months: 24, pilot_mode: 'A' }
+    );
+
+    const { totalExpenses } = calculateExpensesBreakdown(this.getExpenses());
+
+    return calculateMmfReconciliation(
+      totals.moneyIn,
+      totalExpenses,
+      this.auditInputs.totalDeposited,
+      this.auditInputs.mmfBalance,
+      this.auditInputs.cumulativeInterest,
+      this.asOfDate
+    );
+  }
+
+  public getTreasurerDebt(): TreasurerDebtRecord {
+    return calculateTreasurerDebt(
+      this.auditInputs.treasurerDebtLiability,
+      this.getLedgerEntries(),
+      this.auditInputs.treasurerDebtorName
+    );
   }
 
   // --- Actions ---
@@ -476,6 +567,383 @@ export class ChamaStore {
 
     this.saveToStorage();
     return { success: true, member };
+  }
+
+  // --- Phase 2 Actions: Expenses ---
+
+  public recordExpense(data: {
+    category: ExpenseCategory;
+    description: string;
+    amount: number;
+    date: string;
+    authorizedBy?: string;
+    notesReceipt?: string;
+    receiptPhotoUrl?: string;
+  }): { success: boolean; error?: string } {
+    const group = this.getCurrentGroup();
+    if (!group) return { success: false, error: 'Group not found' };
+
+    const membership = this.getCurrentMembership();
+    const isTreasurer = membership?.role === 'Treasurer 1' || membership?.role === 'Treasurer 2' || membership?.role === 'Treasurer' || membership?.role === 'President';
+    if (!isTreasurer) {
+      return { success: false, error: 'Only Treasurers or the President can record group expenses.' };
+    }
+
+    const expNo = `E${String(this.expenses.length + 1).padStart(3, '0')}`;
+    const newExpense: Expense = {
+      id: `exp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      groupId: group.id,
+      expenseNo: expNo,
+      date: data.date,
+      category: data.category,
+      description: data.description,
+      amount: data.amount,
+      authorizedBy: data.authorizedBy || 'Wesley',
+      notesReceipt: data.notesReceipt,
+      receiptPhotoUrl: data.receiptPhotoUrl,
+      status: 'Pending Confirmation',
+      recordedBy: this.currentUser.id,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.expenses.unshift(newExpense);
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: group.id,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'User',
+      action: 'RECORD_EXPENSE',
+      entity: 'EXPENSE',
+      entityId: newExpense.id,
+      details: { amount: newExpense.amount, category: newExpense.category, description: newExpense.description },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
+  }
+
+  public confirmExpense(expenseId: string): { success: boolean; error?: string } {
+    const expense = this.expenses.find(e => e.id === expenseId);
+    if (!expense) return { success: false, error: 'Expense record not found' };
+
+    const membership = this.getCurrentMembership();
+    const isTreasurer = membership?.role === 'Treasurer 1' || membership?.role === 'Treasurer 2' || membership?.role === 'Treasurer';
+    if (!isTreasurer) {
+      return { success: false, error: 'Only a Treasurer can confirm expenses.' };
+    }
+
+    // Two-Treasurer Dual Control Rule: Self-confirmation blocked!
+    if (expense.recordedBy === this.currentUser.id) {
+      return {
+        success: false,
+        error: 'Security Rule: A treasurer cannot confirm their own expense entry. A different treasurer must confirm.'
+      };
+    }
+
+    expense.status = 'Confirmed';
+    expense.confirmedBy = this.currentUser.id;
+    expense.confirmedAt = new Date().toISOString();
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: expense.groupId,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'User',
+      action: 'CONFIRM_EXPENSE',
+      entity: 'EXPENSE',
+      entityId: expense.id,
+      details: { amount: expense.amount, confirmedBy: this.currentUser.id },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
+  }
+
+  public rejectExpense(expenseId: string, reason: string): { success: boolean; error?: string } {
+    const expense = this.expenses.find(e => e.id === expenseId);
+    if (!expense) return { success: false, error: 'Expense record not found' };
+
+    expense.status = 'Rejected';
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: expense.groupId,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'User',
+      action: 'REJECT_EXPENSE',
+      entity: 'EXPENSE',
+      entityId: expense.id,
+      details: { reason },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
+  }
+
+  // --- Phase 2 Actions: MMF Reconciliation ---
+
+  public updateAuditInputs(inputs: Partial<typeof NDHUHULU_AUDIT_INPUTS>) {
+    this.auditInputs = { ...this.auditInputs, ...inputs };
+    this.saveToStorage();
+  }
+
+  public recordMmfDeposit(data: {
+    date: string;
+    amount: number;
+    source: MmfDepositEntry['source'];
+    notes?: string;
+  }): { success: boolean } {
+    const group = this.getCurrentGroup();
+    if (!group) return { success: false };
+
+    const newDeposit: MmfDepositEntry = {
+      id: `mmf-dep-${Date.now()}`,
+      groupId: group.id,
+      date: data.date,
+      amount: data.amount,
+      source: data.source,
+      notes: data.notes,
+      recordedBy: this.currentUser.id,
+      confirmedBy: this.currentUser.id,
+    };
+
+    this.mmfDeposits.push(newDeposit);
+    // Update running total deposited to MMF
+    this.auditInputs.totalDeposited = this.mmfDeposits.reduce((sum, d) => sum + d.amount, 0);
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: group.id,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'User',
+      action: 'RECORD_MMF_DEPOSIT',
+      entity: 'MMF_DEPOSIT',
+      entityId: newDeposit.id,
+      details: { amount: newDeposit.amount, source: newDeposit.source },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
+  }
+
+  // --- Phase 2 Actions: Documents ---
+
+  public uploadDocument(data: {
+    title: string;
+    category: DocumentCategory;
+    visibility: DocumentVisibility;
+    fileName: string;
+    fileUrl?: string;
+    changeSummary?: string;
+  }): { success: boolean; documentId: string } {
+    const group = this.getCurrentGroup();
+    const docId = `doc-${Date.now()}`;
+
+    const newDoc: DocumentRecord = {
+      id: docId,
+      groupId: group ? group.id : 'group-ndhuhulu-001',
+      title: data.title,
+      category: data.category,
+      visibility: data.visibility,
+      currentVersionNumber: 1,
+      releasedVersionNumber: undefined, // Hidden from members until approved!
+      status: 'Pending approval',
+      uploadedBy: this.currentUser.id,
+      uploadedByName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      versions: [
+        {
+          versionNumber: 1,
+          fileName: data.fileName,
+          fileUrl: data.fileUrl || `/docs/${data.fileName}`,
+          uploadedBy: this.currentUser.id,
+          uploadedByName: this.currentUser.fullName || this.currentUser.email || 'Official',
+          uploadedAt: new Date().toISOString(),
+          changeSummary: data.changeSummary || 'Initial document upload',
+          status: 'Pending approval',
+          approvals: []
+        }
+      ]
+    };
+
+    this.documents.unshift(newDoc);
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: newDoc.groupId,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      action: 'UPLOAD_DOCUMENT',
+      entity: 'DOCUMENT',
+      entityId: newDoc.id,
+      details: { title: newDoc.title, category: newDoc.category, version: 1 },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true, documentId: docId };
+  }
+
+  public uploadDocumentVersion(docId: string, data: {
+    fileName: string;
+    fileUrl?: string;
+    changeSummary?: string;
+  }): { success: boolean; error?: string } {
+    const doc = this.documents.find(d => d.id === docId);
+    if (!doc) return { success: false, error: 'Document not found' };
+
+    const newVersionNumber = doc.currentVersionNumber + 1;
+    doc.currentVersionNumber = newVersionNumber;
+    doc.status = 'Pending approval'; // Version returns to Pending approval; old released version stays visible
+    doc.updatedAt = new Date().toISOString();
+
+    doc.versions.unshift({
+      versionNumber: newVersionNumber,
+      fileName: data.fileName,
+      fileUrl: data.fileUrl || `/docs/${data.fileName}`,
+      uploadedBy: this.currentUser.id,
+      uploadedByName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      uploadedAt: new Date().toISOString(),
+      changeSummary: data.changeSummary || `Version ${newVersionNumber} revision`,
+      status: 'Pending approval',
+      approvals: []
+    });
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: doc.groupId,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      action: 'UPLOAD_DOCUMENT_VERSION',
+      entity: 'DOCUMENT',
+      entityId: doc.id,
+      details: { title: doc.title, newVersion: newVersionNumber },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
+  }
+
+  public approveDocument(docId: string, versionNumber: number): { success: boolean; error?: string } {
+    const doc = this.documents.find(d => d.id === docId);
+    if (!doc) return { success: false, error: 'Document not found' };
+
+    const membership = this.getCurrentMembership();
+    const isOfficial = membership?.role && [
+      'President', 'Vice President', 'Secretary', 'Organizing Secretary',
+      'Treasurer 1', 'Treasurer 2', 'Auditor'
+    ].includes(membership.role);
+
+    if (!isOfficial) {
+      return { success: false, error: 'Only officials can approve documents.' };
+    }
+
+    const version = doc.versions.find(v => v.versionNumber === versionNumber);
+    if (!version) return { success: false, error: 'Version not found' };
+
+    // Uploader cannot approve their own upload!
+    if (version.uploadedBy === this.currentUser.id) {
+      return {
+        success: false,
+        error: 'Security Rule: Another official must approve this document. You cannot approve your own upload.'
+      };
+    }
+
+    version.status = 'Released';
+    version.approvals.push({
+      id: `appr-${Date.now()}`,
+      versionNumber,
+      officialUserId: this.currentUser.id,
+      officialName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      action: 'Approved',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Mark document as Released and update released version
+    doc.status = 'Released';
+    doc.releasedVersionNumber = versionNumber;
+    doc.updatedAt = new Date().toISOString();
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: doc.groupId,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      action: 'APPROVE_DOCUMENT',
+      entity: 'DOCUMENT',
+      entityId: doc.id,
+      details: { title: doc.title, version: versionNumber },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
+  }
+
+  public rejectDocument(docId: string, versionNumber: number, reason: string): { success: boolean; error?: string } {
+    const doc = this.documents.find(d => d.id === docId);
+    if (!doc) return { success: false, error: 'Document not found' };
+
+    const version = doc.versions.find(v => v.versionNumber === versionNumber);
+    if (!version) return { success: false, error: 'Version not found' };
+
+    version.status = 'Rejected';
+    version.approvals.push({
+      id: `appr-${Date.now()}`,
+      versionNumber,
+      officialUserId: this.currentUser.id,
+      officialName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      action: 'Rejected',
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+
+    doc.status = 'Rejected';
+    doc.updatedAt = new Date().toISOString();
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: doc.groupId,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      action: 'REJECT_DOCUMENT',
+      entity: 'DOCUMENT',
+      entityId: doc.id,
+      details: { title: doc.title, version: versionNumber, reason },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
+  }
+
+  public deleteDocument(docId: string): { success: boolean } {
+    const doc = this.documents.find(d => d.id === docId);
+    if (!doc) return { success: false };
+
+    this.documents = this.documents.filter(d => d.id !== docId);
+
+    this.auditLog.unshift({
+      id: `audit-${Date.now()}`,
+      groupId: doc.groupId,
+      actorUserId: this.currentUser.id,
+      actorName: this.currentUser.fullName || this.currentUser.email || 'Official',
+      action: 'DELETE_DOCUMENT',
+      entity: 'DOCUMENT',
+      entityId: docId,
+      details: { title: doc.title },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.saveToStorage();
+    return { success: true };
   }
 
   public resetAllToMigrationBenchmark() {

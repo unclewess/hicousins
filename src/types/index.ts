@@ -138,6 +138,119 @@ export interface MemberCalculatedStatement {
   payments: LedgerEntry[];
 }
 
+// ============================================================================
+// Phase 2 Types: Expenses, MMF Reconciliation, Documents & Learn
+// ============================================================================
+
+export type ExpenseCategory =
+  | 'Transaction Cost'
+  | 'Group Registration Fees'
+  | 'Meeting Expenses'
+  | 'Communication'
+  | 'Other Group Expenses';
+
+export interface Expense {
+  id: string;
+  groupId: string;
+  expenseNo: string; // e.g. 'E001'
+  date: string; // 'YYYY-MM-DD'
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  authorizedBy?: string;
+  notesReceipt?: string;
+  receiptPhotoUrl?: string;
+  status: LedgerStatus; // 'Pending Confirmation' | 'Confirmed' | 'Rejected'
+  recordedBy?: string;
+  confirmedBy?: string;
+  confirmedAt?: string;
+  createdAt: string;
+}
+
+export type MmfDepositSource = 'Member Funds' | 'Penalty Fines' | 'Treasurer Debt Repayment';
+
+export interface MmfDepositEntry {
+  id: string;
+  groupId: string;
+  date: string;
+  amount: number;
+  source: MmfDepositSource;
+  notes?: string;
+  recordedBy?: string;
+  confirmedBy?: string;
+}
+
+export interface MmfReconciliationSnapshot {
+  groupId: string;
+  asOfDate: string;
+  totalDeposited: number;
+  mmfBalance: number;
+  interestEarned: number;
+  expectedBalance: number;
+  discrepancy: number;
+  status: 'Balanced' | 'Discrepancy';
+  cashOnHand: number;
+  netFundValue: number;
+  negativeCashFlag: boolean;
+  notes?: string;
+}
+
+export interface TreasurerDebtRecord {
+  agreedLiability: number; // 8,184
+  repaidToDate: number; // 2,000
+  outstandingBalance: number; // 6,184
+  debtorName: string; // Antoinette Ochieng
+}
+
+export type DocumentCategory =
+  | 'Constitution'
+  | 'Minutes'
+  | 'Audit Reports'
+  | 'MMF Statements'
+  | 'Other';
+
+export type DocumentVisibility = 'All members' | 'Officials only';
+
+export type DocumentStatus = 'Draft' | 'Pending approval' | 'Released' | 'Rejected';
+
+export interface DocumentApproval {
+  id: string;
+  versionNumber: number;
+  officialUserId: string;
+  officialName: string;
+  action: 'Approved' | 'Rejected';
+  reason?: string;
+  timestamp: string;
+}
+
+export interface DocumentVersion {
+  versionNumber: number;
+  fileUrl: string;
+  fileName: string;
+  uploadedBy: string;
+  uploadedByName: string;
+  uploadedAt: string;
+  changeSummary?: string;
+  status: DocumentStatus;
+  approvals: DocumentApproval[];
+}
+
+export interface DocumentRecord {
+  id: string;
+  groupId: string;
+  title: string;
+  category: DocumentCategory;
+  visibility: DocumentVisibility;
+  currentVersionNumber: number;
+  releasedVersionNumber?: number; // Latest approved version visible to members
+  status: DocumentStatus;
+  uploadedBy: string;
+  uploadedByName: string;
+  versions: DocumentVersion[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DashboardTotals {
   activeMembersCount: number;
   totalShares: number;

@@ -364,3 +364,82 @@ T286,2026-09-13,Belinda Otieno,500,Contribution,Apr-2026 – Aug-2026
 T289,2026-09-28,Keziah Auma,1300,Contribution,Jan-2026 – Jan-2027
 T290,2026-10-16,Noel Oduor,500,Contribution,Jul-2026 – Nov-2026
 TOTALS,,235 contribution entries,248300,7500,706`;
+
+export const NDHUHULU_EXPENSES_RAW_CSV = `No.,Date,Category,Description,Amount (KES),Authorized By,Notes / Receipt #
+E001,2025-09-30,Transaction Cost,Deposit to MMF,1318,Wesley,Whole financial year 2024-2025
+E002,2025-10-29,Transaction Cost,Deposit to MMF,48,Wesley,
+E003,2025-11-29,Transaction Cost,Deposit to MMF,42,Wesley,
+E004,2025-12-30,Transaction Cost,Deposit to MMF,25,Wesley,
+E005,2026-01-28,Transaction Cost,Deposit to MMF,52,Wesley,
+E006,2026-02-27,Transaction Cost,Deposit to MMF,56,Wesley,
+E007,2026-04-10,Transaction Cost,Deposit to MMF,56,Wesley,
+E008,2026-05-25,Transaction Cost,Deposit to MMF,73,Wesley,
+E009,2026-07-30,Transaction Cost,Deposit to MMF,56,Wesley ,
+E010,2026-08-03,Other Group Expense,Withholding tax ,5615.77,,what has been taxed since we started the MMF
+E011,2026-08-31,Other Group Expense,Withholding tax ,282.5,,
+E012,2026-09-30,Other Group Expense,Withholding tax ,277.68,,
+E013,2026-09-23,Transaction Cost,Deposit to MMF,56,Wesley ,`;
+
+export const NDHUHULU_AUDIT_INPUTS = {
+  totalDeposited: 248704,
+  mmfBalance: 283701.20,
+  cumulativeInterest: 41173.16,
+  treasurerDebtLiability: 8184,
+  treasurerDebtorName: 'Antoinette Ochieng',
+  penaltyFinesDepositedDate: '2025-10-29', // Recorded fine deposit date
+};
+
+export const NDHUHULU_GUIDE_SECTIONS = [
+  {
+    title: 'WHAT TO ENTER',
+    items: [
+      { subtitle: 'Only 2 Routine Inputs', content: '(1) New payments in PAYMENTS sheet — one row per payment received. (2) MMF balance in AUDIT sheet monthly from CIC statement.' }
+    ]
+  },
+  {
+    title: 'RECORDING A PAYMENT',
+    items: [
+      { subtitle: 'Step 1: Go to Payments Ledger', content: 'Open the Payments tab in the app.' },
+      { subtitle: 'Step 2: Enter Details', content: 'Select Member Name | Amount | Type | Date | Notes.' },
+      { subtitle: 'Step 3: Two-Treasurer Dual Control', content: 'One treasurer records the entry, and a different treasurer confirms it. Self-confirmation is blocked.' }
+    ]
+  },
+  {
+    title: 'PAYMENT TYPES',
+    items: [
+      { subtitle: 'Contribution', content: 'Regular monthly payments (KES 100 or more). 1 share = KES 100.' },
+      { subtitle: 'Penalty Payment', content: 'When a member pays their penalty fine — reduces their penalty balance and adds to money to deposit.' },
+      { subtitle: 'Admin Income', content: 'Registration fees only (one-time fee when joining the chama).' },
+      { subtitle: 'Debt Repayment', content: 'Discrepancy repayments ONLY. Excluded from shares and excluded from money_in to prevent double counting.' }
+    ]
+  },
+  {
+    title: 'FIFO ALLOCATION RULE',
+    items: [
+      { subtitle: 'How Payments are Allocated', content: 'Every KES 100 = 1 month covered, always filling sequentially from the earliest unpaid month. Extra pays ahead; remainder under 100 is held as credit.' },
+      { subtitle: 'Example', content: 'Join Jan-2023, paid KES 4,800 -> 48 months -> Paid Up To Dec-2026.' }
+    ]
+  },
+  {
+    title: 'PENALTY CALCULATION RULE',
+    items: [
+      { subtitle: 'Formula from Oct-2025', content: 'Penalty = 10,100 × (1.01^N - 1) - 100 × N where N = whole months behind from Oct-2025.' },
+      { subtitle: 'Why Compound 1%/month?', content: 'Reflects the actual Money Market Fund (MMF) opportunity cost to the group, rather than an arbitrary flat fine.' }
+    ]
+  },
+  {
+    title: 'MMF RECONCILIATION',
+    items: [
+      { subtitle: 'Monthly Update Process', content: 'Receive CIC monthly statement. Update Total Deposited, Current MMF Balance, and Cumulative Interest.' },
+      { subtitle: 'Reconciliation Status', content: 'Shows Balanced if discrepancy < 1 KES; otherwise Discrepancy with investigation notes.' }
+    ]
+  },
+  {
+    title: 'CONSTITUTIONAL RULES',
+    items: [
+      { subtitle: 'Allan Ogara (Deceased)', content: 'Shares frozen at 36. Beneficiary UNRESOLVED. Group must agree before any disbursement.' },
+      { subtitle: 'Donald Oyoo (Left)', content: 'Shares frozen at 12. Receives proportional payout at final disbursement.' },
+      { subtitle: 'Never Active Members', content: 'Never contributed — zero shares, no claim on fund.' }
+    ]
+  }
+];
