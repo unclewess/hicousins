@@ -8,15 +8,16 @@ import { MembersView } from './components/MembersView';
 import { ExpensesView } from './components/ExpensesView';
 import { MmfReconciliationView } from './components/MmfReconciliationView';
 import { LearnReportView } from './components/LearnReportView';
+import { GovernanceView } from './components/GovernanceView';
 import { HelpView } from './components/HelpView';
 import { InviteModal } from './components/InviteModal';
 import { ClaimProfileModal } from './components/ClaimProfileModal';
 import {
   LayoutDashboard, FileText, BookOpen, Users,
-  Receipt, Scale, Library, HelpCircle, UserPlus,
+  Receipt, Scale, Library, HelpCircle, UserPlus, Vote
 } from 'lucide-react';
 
-type TabKey = 'dashboard' | 'statement' | 'ledger' | 'members' | 'expenses' | 'mmf' | 'documents' | 'help';
+type TabKey = 'dashboard' | 'statement' | 'ledger' | 'members' | 'governance' | 'expenses' | 'mmf' | 'documents' | 'help';
 
 interface NavItem {
   key: TabKey;
@@ -27,14 +28,15 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard',  label: 'Dashboard',       shortLabel: 'Home',      icon: <LayoutDashboard className="w-4 h-4" /> },
-  { key: 'statement',  label: 'My Statement',     shortLabel: 'Statement', icon: <FileText className="w-4 h-4" /> },
-  { key: 'ledger',     label: 'Payments Ledger',  shortLabel: 'Payments',  icon: <BookOpen className="w-4 h-4" /> },
-  { key: 'members',    label: 'Members & Roles',  shortLabel: 'Members',   icon: <Users className="w-4 h-4" /> },
-  { key: 'expenses',   label: 'Expenses',         shortLabel: 'Expenses',  icon: <Receipt className="w-4 h-4" />, officialOnly: true },
-  { key: 'mmf',        label: 'Audit & MMF',      shortLabel: 'Audit',     icon: <Scale className="w-4 h-4" />, officialOnly: true },
-  { key: 'documents',  label: 'Documents',        shortLabel: 'Docs',      icon: <Library className="w-4 h-4" /> },
-  { key: 'help',       label: 'Help',             shortLabel: 'Help',      icon: <HelpCircle className="w-4 h-4" /> },
+  { key: 'dashboard',   label: 'Dashboard',         shortLabel: 'Home',      icon: <LayoutDashboard className="w-4 h-4" /> },
+  { key: 'statement',   label: 'My Statement',       shortLabel: 'Statement', icon: <FileText className="w-4 h-4" /> },
+  { key: 'governance',  label: 'Governance & Votes', shortLabel: 'Votes',     icon: <Vote className="w-4 h-4" /> },
+  { key: 'ledger',      label: 'Payments Ledger',    shortLabel: 'Payments',  icon: <BookOpen className="w-4 h-4" /> },
+  { key: 'members',     label: 'Members & Roles',    shortLabel: 'Members',   icon: <Users className="w-4 h-4" /> },
+  { key: 'expenses',    label: 'Expenses',           shortLabel: 'Expenses',  icon: <Receipt className="w-4 h-4" />, officialOnly: true },
+  { key: 'mmf',         label: 'Audit & MMF',        shortLabel: 'Audit',     icon: <Scale className="w-4 h-4" />, officialOnly: true },
+  { key: 'documents',   label: 'Documents',          shortLabel: 'Docs',      icon: <Library className="w-4 h-4" /> },
+  { key: 'help',        label: 'Help',               shortLabel: 'Help',      icon: <HelpCircle className="w-4 h-4" /> },
 ];
 
 export const App: React.FC = () => {
@@ -106,10 +108,11 @@ export const App: React.FC = () => {
         </div>
 
         {/* Tab Views */}
-        {currentTab === 'dashboard'  && <DashboardView />}
-        {currentTab === 'statement'  && <MyStatementView />}
-        {currentTab === 'ledger'     && <LedgerView />}
-        {currentTab === 'members'    && <MembersView />}
+        {currentTab === 'dashboard'   && <DashboardView />}
+        {currentTab === 'statement'   && <MyStatementView />}
+        {currentTab === 'governance'  && <GovernanceView />}
+        {currentTab === 'ledger'      && <LedgerView />}
+        {currentTab === 'members'     && <MembersView />}
         {currentTab === 'expenses'   && isOfficial && <ExpensesView />}
         {currentTab === 'mmf'        && isOfficial && <MmfReconciliationView />}
         {currentTab === 'documents'  && <LearnReportView />}

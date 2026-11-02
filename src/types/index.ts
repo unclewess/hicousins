@@ -266,3 +266,165 @@ export interface DashboardTotals {
   deceasedCount: number;
   neverActiveCount: number;
 }
+
+// ============================================================================
+// Phase 3 Types: Meetings, Attendance, Voting & Elections, Welfare, Notices
+// ============================================================================
+
+export type MeetingType = 'Regular' | 'AGM' | 'Special' | 'Committee';
+export type MeetingStatus = 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
+
+export interface Meeting {
+  id: string;
+  groupId: string;
+  title: string;
+  meetingDate: string; // ISO string
+  agenda: string;
+  meetingType: MeetingType;
+  minutesDocId?: string;
+  status: MeetingStatus;
+  createdBy: string;
+  createdAt: string;
+}
+
+export type AttendanceStatus = 'Present' | 'Absent' | 'Apology' | 'Late';
+
+export interface AttendanceRecord {
+  id: string;
+  meetingId: string;
+  memberId: string;
+  status: AttendanceStatus;
+  checkedInAt?: string;
+  checkedInBy?: string;
+  notes?: string;
+}
+
+export interface MemberAttendanceSummary {
+  memberId: string;
+  memberName: string;
+  totalMeetings: number;
+  attendedMeetings: number;
+  attendanceRate: number; // 0 to 100 percentage
+}
+
+export type MotionType = 'General' | 'Disbursement' | 'Election' | 'ConstitutionAmendment';
+export type BallotType = 'Secret' | 'Open';
+export type MotionStatus = 'Draft' | 'Open' | 'Closed' | 'Cancelled';
+
+export interface ElectionCandidate {
+  memberId: string;
+  memberName: string;
+  nominatedBy?: string;
+  statement?: string;
+}
+
+export interface Motion {
+  id: string;
+  groupId: string;
+  title: string;
+  description: string;
+  motionType: MotionType;
+  ballotType: BallotType;
+  targetRole?: RoleType;
+  options: string[]; // Options like ['Yes', 'No', 'Abstain'] or Candidate IDs
+  candidates?: ElectionCandidate[];
+  returningOfficerId: string; // Chief Whip or Auditor administering
+  status: MotionStatus;
+  openUntil: string;
+  closedAt?: string;
+  disbursementAmount?: number;
+  disbursementBeneficiary?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+// Records WHO voted (turnout) - Never contains the voter's choice
+export interface TurnoutRecord {
+  id: string;
+  motionId: string;
+  memberId: string;
+  votedAt: string;
+}
+
+// Records the vote choice. In a Secret ballot, voterMemberId is omitted / strictly undefined.
+export interface BallotVote {
+  id: string;
+  motionId: string;
+  choice: string;
+  voterMemberId?: string; // ONLY populated if ballotType === 'Open'. In 'Secret', voterMemberId is strictly omitted
+  votedAt: string;
+}
+
+export interface MotionResult {
+  motionId: string;
+  totalVotes: number;
+  resultsByOption: Record<string, number>;
+  winnerOption?: string;
+  quorumMet: boolean;
+  isClosed: boolean;
+}
+
+export interface HandoverLogEntry {
+  id: string;
+  groupId: string;
+  role: RoleType;
+  previousMemberId: string;
+  newMemberId: string;
+  electionMotionId: string;
+  handoverDate: string;
+  notes?: string;
+}
+
+// Welfare & Disputes (restricted visibility)
+export type WelfareCaseStatus = 'Open' | 'Under Review' | 'Resolved' | 'Closed';
+export type WelfareCasePriority = 'Low' | 'Medium' | 'High' | 'Urgent';
+export type WelfareCategory = 'Bereavement' | 'Illness' | 'Dispute' | 'Financial Emergency' | 'Other';
+
+export interface WelfareCase {
+  id: string;
+  groupId: string;
+  caseNumber: string;
+  title: string;
+  reportedByMemberId: string;
+  subjectMemberId?: string;
+  category: WelfareCategory;
+  privateNotes: string; // Only visible to Chief Whips and President
+  status: WelfareCaseStatus;
+  priority: WelfareCasePriority;
+  assistanceAmount?: number;
+  deletionRequested?: boolean;
+  deletionRequestedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+}
+
+export interface CaseViewLog {
+  id: string;
+  caseId: string;
+  viewedByUserId: string;
+  viewedByName: string;
+  viewedRole: string;
+  timestamp: string;
+}
+
+// Notices & Reminders
+export type NoticePriority = 'Normal' | 'Important' | 'Urgent';
+export type NoticeChannel = 'In-App' | 'SMS' | 'Push' | 'WhatsApp';
+export type NoticeCategory = 'Meeting' | 'Arrears' | 'Announcement' | 'Election' | 'General';
+
+export interface Notice {
+  id: string;
+  groupId: string;
+  title: string;
+  content: string;
+  category: NoticeCategory;
+  priority: NoticePriority;
+  channels: NoticeChannel[];
+  targetAudience: 'All' | 'Arrears Only' | 'Officials Only';
+  authorId: string;
+  authorName: string;
+  publishedAt: string;
+  expiresAt?: string;
+}
+
